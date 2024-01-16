@@ -48,6 +48,18 @@ define( 'JCCGATEWAY_PLUGIN_URL',	plugin_dir_url( JCCGATEWAY_PLUGIN_FILE ) );
  */
 require_once JCCGATEWAY_PLUGIN_DIR . 'core/class-jcc-gateway-for-givewp.php';
 
+/* Github plugin updater code */
+require 'plugin-update-checker/plugin-update-checker.php';
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+$myUpdateChecker = PucFactory::buildUpdateChecker(
+    'https://github.com/GeorgeWebDevCy/jcc-gateway-for-givewp',
+    __FILE__,
+    'jcc-gateway-for-givewp'
+);
+$myUpdateChecker->setBranch('main');
+
+
 /**
  * The main function to load the only instance
  * of our master class.

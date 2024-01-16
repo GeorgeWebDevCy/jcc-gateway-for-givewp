@@ -60,6 +60,30 @@ $myUpdateChecker = PucFactory::buildUpdateChecker(
 $myUpdateChecker->setBranch('main');
 
 
+//Make sure Givewp is active and if not show a notice amd keep it inactive until Givewp is active
+add_action( 'admin_init', 'jcc_givewp_plugin_active' );
+function jcc_givewp_plugin_active() {
+	if ( is_plugin_active( 'give/give.php' ) ) {
+		return;
+	} else {
+		deactivate_plugins( plugin_basename( __FILE__ ) );
+		add_action( 'admin_notices', 'jcc_givewp_plugin_inactive_notice' );
+	}
+}
+
+//notice for Givewp inactive
+function jcc_givewp_plugin_inactive_notice() {
+	?>
+	<div class="notice notice-error is-dismissible">
+		<p><?php _e( 'JCC Gateway For GiveWP requires GiveWP plugin to be active. Please activate GiveWP plugin first.', 'jcc-gateway-for-givewp' ); ?></p>
+	</div>
+	<?php
+}
+
+
+
+
+
 /**
  * The main function to load the only instance
  * of our master class.

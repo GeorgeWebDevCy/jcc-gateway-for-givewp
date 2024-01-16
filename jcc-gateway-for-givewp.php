@@ -81,8 +81,16 @@ function jcc_givewp_plugin_inactive_notice() {
 }
 
 
+//register the gateway
+add_filter( 'give_payment_gateways', 'jcc_givewp_register_gateway' );
+function jcc_givewp_register_gateway( $gateways ) {
+	$gateways['jcc-gateway-for-givewp'] = array(
+		'admin_label'    => __( 'JCC Gateway For GiveWP', 'jcc-gateway-for-givewp' ),
+		'checkout_label' => __( 'JCC Gateway For GiveWP', 'jcc-gateway-for-givewp' ),
+	);
 
-
+	return $gateways;
+}
 
 /**
  * The main function to load the only instance

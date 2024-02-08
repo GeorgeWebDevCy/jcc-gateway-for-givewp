@@ -25,30 +25,28 @@
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) exit;
-
 // Plugin name
-define( 'JCCGATEWAY_NAME', 'JCC Gateway For GiveWP' );
+define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION', '1.0.0' );
+define( 'JCCGATEWAY_VERSION',		'1.0.0' );
 
 // Plugin Root File
-define( 'JCCGATEWAY_PLUGIN_FILE', __FILE__ );
+define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
 
 // Plugin base
-define( 'JCCGATEWAY_PLUGIN_BASE', plugin_basename( JCCGATEWAY_PLUGIN_FILE ) );
+define( 'JCCGATEWAY_PLUGIN_BASE',	plugin_basename( JCCGATEWAY_PLUGIN_FILE ) );
 
 // Plugin Folder Path
-define( 'JCCGATEWAY_PLUGIN_DIR', plugin_dir_path( JCCGATEWAY_PLUGIN_FILE ) );
+define( 'JCCGATEWAY_PLUGIN_DIR',	plugin_dir_path( JCCGATEWAY_PLUGIN_FILE ) );
 
 // Plugin Folder URL
-define( 'JCCGATEWAY_PLUGIN_URL', plugin_dir_url( JCCGATEWAY_PLUGIN_FILE ) );
+define( 'JCCGATEWAY_PLUGIN_URL',	plugin_dir_url( JCCGATEWAY_PLUGIN_FILE ) );
 
 /**
  * Load the main class for the core functionality
  */
 require_once JCCGATEWAY_PLUGIN_DIR . 'core/class-jcc-gateway-for-givewp.php';
-require_once JCCGATEWAY_PLUGIN_DIR . 'core/class-offsite-jcc-gateway.php';
 
 /* Github plugin updater code */
 require 'plugin-update-checker/plugin-update-checker.php';
@@ -61,88 +59,49 @@ $myUpdateChecker = PucFactory::buildUpdateChecker(
 );
 $myUpdateChecker->setBranch('main');
 
-// Make sure Givewp is active and if not show a notice and keep it inactive until Givewp is active
+
+//Make sure Givewp is active and if not show a notice amd keep it inactive until Givewp is active
 add_action( 'admin_init', 'jcc_givewp_plugin_active' );
 function jcc_givewp_plugin_active() {
-    if ( is_plugin_active( 'give/give.php' ) ) {
-		//set default settings for options that are not set 
-		$settings = get_option( 'give_settings_jcc-gateway-for-givewp_settings' );
-		if ( !isset($settings['givewp_jcc_payment_gateway_enabled']) ) {
-			$settings['givewp_jcc_payment_gateway_enabled'] = 'on';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_title']) ) {
-			$settings['givewp_jcc_payment_gateway_title'] = 'Credit/Debit card';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_test_mode']) ) {	
-			$settings['givewp_jcc_payment_gateway_test_mode'] = 'on';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_test_financial_service_wsdl']) ) {
-			$settings['givewp_jcc_payment_gateway_test_financial_service_wsdl'] = 'https://testpayments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx?WSDL';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_test_request_url']) ) {
-			$settings['givewp_jcc_payment_gateway_test_request_url'] = 'https://testpayments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_test_merchant_id']) ) {
-			$settings['givewp_jcc_payment_gateway_test_merchant_id'] = '000000000000000000000';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_test_password']) ) {
-			$settings['givewp_jcc_payment_gateway_test_password'] = '111111111111111111111';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_production_financial_service_wsdl']) ) {
-			$settings['givewp_jcc_payment_gateway_production_financial_service_wsdl'] = 'https://payments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx?WSDL';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_production_request_url']) ) {
-			$settings['givewp_jcc_payment_gateway_production_request_url'] = 'https://payments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_production_merchant_id']) ) {
-			$settings['givewp_jcc_payment_gateway_production_merchant_id'] = '000000000000000000000';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_production_password']) ) {
-			$settings['givewp_jcc_payment_gateway_production_password'] = '111111111111111111111';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_custom_order_id']) ) {
-			$settings['givewp_jcc_payment_gateway_custom_order_id'] = 'Alphanumeric1';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_merchant_order_id_prefix']) ) {
-			$settings['givewp_jcc_payment_gateway_merchant_order_id_prefix'] = 'wc_order_';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_version']) ) {
-			$settings['givewp_jcc_payment_gateway_version'] = '1.0.0';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_acquirer_id']) ) {
-			$settings['givewp_jcc_payment_gateway_acquirer_id'] = '000000000000000000000';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_capture_flag']) ) {
-			$settings['givewp_jcc_payment_gateway_capture_flag'] = 'A';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_signature_method']) ) {
-			$settings['givewp_jcc_payment_gateway_signature_method'] = 'SHA1';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_send_billing_info']) ) {
-			$settings['givewp_jcc_payment_gateway_send_billing_info'] = 'on';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_send_shipping_info']) ) {
-			$settings['givewp_jcc_payment_gateway_send_shipping_info'] = 'on';
-		}
-		if ( !isset($settings['givewp_jcc_payment_gateway_send_general_info']) ) {
-			$settings['givewp_jcc_payment_gateway_send_general_info'] = 'on';
-		}
-		update_option( 'give_settings_jcc-gateway-for-givewp_settings', $settings );
-        return;
-    } else {
-        deactivate_plugins( plugin_basename( __FILE__ ) );
-        add_action( 'admin_notices', 'jcc_givewp_plugin_inactive_notice' );
+	if ( is_plugin_active( 'give/give.php' ) ) {
+		return;
+	} else {
+		deactivate_plugins( plugin_basename( __FILE__ ) );
+		add_action( 'admin_notices', 'jcc_givewp_plugin_inactive_notice' );
+	}
+}
+
+//notice for Givewp inactive
+function jcc_givewp_plugin_inactive_notice() {
+	?>
+	<div class="notice notice-error is-dismissible">
+		<p><?php _e( 'JCC Gateway For GiveWP requires GiveWP plugin to be active. Please activate GiveWP plugin first.', 'jcc-gateway-for-givewp' ); ?></p>
+	</div>
+	<?php
+}
+
+// delete the settings when the plugin is deactivated to avoid any conflicts
+register_deactivation_hook( __FILE__, 'jcc_givewp_deactivate' );
+function jcc_givewp_deactivate() {
+    delete_option( 'give_settings_jcc-gateway-for-givewp' );
+}
+
+
+//set the default settings on plugin activation if the settings are not in the database
+register_activation_hook( __FILE__, 'jcc_givewp_activate' );
+function jcc_givewp_activate() {
+    if ( ! get_option( 'give_settings_jcc-gateway-for-givewp' ) ) {
+        update_option( 'give_settings_jcc-gateway-for-givewp', jcc_givewp_default_gateway_settings() );
     }
 }
 
-// Notice for Givewp inactive
-function jcc_givewp_plugin_inactive_notice() {
-    ?>
-    <div class="notice notice-error is-dismissible">
-        <p><?php _e( 'JCC Gateway For GiveWP requires GiveWP plugin to be active. Please activate GiveWP plugin first.', 'jcc-gateway-for-givewp' ); ?></p>
-    </div>
-    <?php
+// Get the gateway settings
+function jcc_givewp_get_gateway_settings() {
+    return give_get_settings( 'jcc-gateway-for-givewp' );
 }
+
+
+
 
 // Register the gateway
 add_filter( 'give_payment_gateways', 'jcc_givewp_register_gateway' );
@@ -165,36 +124,6 @@ function jcc_givewp_add_gateway_section( $sections ) {
 // Add the gateway settings
 add_filter( 'give_get_settings_gateways', 'jcc_givewp_add_gateway_settings' );
 
-function jcc_givewp_get_gateway_settings()
-{
-	// Get the settings between GiveWP and JCC Gateway
-	$settings = get_option( 'give_settings_jcc-gateway-for-givewp_settings' );
-	// Get the gateway settings
-	$gateway_settings = array(
-		'givewp_jcc_payment_gateway_enabled' => $settings['givewp_jcc_payment_gateway_enabled'],
-		'givewp_jcc_payment_gateway_title' => $settings['givewp_jcc_payment_gateway_title'],
-		'givewp_jcc_payment_gateway_test_mode' => $settings['givewp_jcc_payment_gateway_test_mode'],
-		'givewp_jcc_payment_gateway_test_financial_service_wsdl' => $settings['givewp_jcc_payment_gateway_test_financial_service_wsdl'],
-		'givewp_jcc_payment_gateway_test_request_url' => $settings['givewp_jcc_payment_gateway_test_request_url'],
-		'givewp_jcc_payment_gateway_test_merchant_id' => $settings['givewp_jcc_payment_gateway_test_merchant_id'],
-		'givewp_jcc_payment_gateway_test_password' => $settings['givewp_jcc_payment_gateway_test_password'],
-		'givewp_jcc_payment_gateway_production_financial_service_wsdl' => $settings['givewp_jcc_payment_gateway_production_financial_service_wsdl'],
-		'givewp_jcc_payment_gateway_production_request_url' => $settings['givewp_jcc_payment_gateway_production_request_url'],
-		'givewp_jcc_payment_gateway_production_merchant_id' => $settings['givewp_jcc_payment_gateway_production_merchant_id'],
-		'givewp_jcc_payment_gateway_production_password' => $settings['givewp_jcc_payment_gateway_production_password'],
-		'givewp_jcc_payment_gateway_custom_order_id' => $settings['givewp_jcc_payment_gateway_custom_order_id'],
-		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => $settings['givewp_jcc_payment_gateway_merchant_order_id_prefix'],
-		'givewp_jcc_payment_gateway_version' => $settings['givewp_jcc_payment_gateway_version'],
-		'givewp_jcc_payment_gateway_acquirer_id' => $settings['givewp_jcc_payment_gateway_acquirer_id'],
-		'givewp_jcc_payment_gateway_capture_flag' => $settings['givewp_jcc_payment_gateway_capture_flag'],
-		'givewp_jcc_payment_gateway_signature_method' => $settings['givewp_jcc_payment_gateway_signature_method'],
-		'givewp_jcc_payment_gateway_send_billing_info' => $settings['givewp_jcc_payment_gateway_send_billing_info'],
-		'givewp_jcc_payment_gateway_send_shipping_info' => $settings['givewp_jcc_payment_gateway_send_shipping_info'],
-		'givewp_jcc_payment_gateway_send_general_info' => $settings['givewp_jcc_payment_gateway_send_general_info'],
-	);
-	return $gateway_settings;
-
-}
 function jcc_givewp_add_gateway_settings( $settings ) {
     // Add HTML heading
     $current_section = give_get_current_setting_section();
@@ -286,7 +215,7 @@ function jcc_givewp_add_gateway_settings( $settings ) {
                     'name'    => __( 'Merchant Order ID format', 'givewp' ),
                     'type'    => 'select',
                     'options' => array(
-                        'Alphanumeric1' => __( 'Alphanumeric starting with the prefix "wc_order_"', 'givewp' ),
+                        'Alphanumeric1' => __( 'Alphanumeric starting with the prefix "give_order_"', 'givewp' ),
                         'Alphanumeric2' => __( 'Alphanumeric', 'givewp' ),
                         'Numeric'       => __( 'Numeric (matches the Order # found in the Orders section of admin\'s page)', 'givewp' ),
                     ),
@@ -352,43 +281,18 @@ function jcc_givewp_add_gateway_settings( $settings ) {
                 ),
             )
         );
-	}
 
-
-
-
-    // If the settings are not in the database, then set them to default
-    if ( ! get_option( 'give_settings_jcc-gateway-for-givewp_settings' ) ) {
-        update_option( 'give_settings_jcc-gateway-for-givewp_settings', jcc_givewp_default_gateway_settings() );
-		//show_current_settings();
-    } else {
-        // If the settings are in the database, then get them and set them to the settings array
-        $settings = get_option( 'give_settings_jcc-gateway-for-givewp_settings' );
-        $settings = jcc_givewp_get_gateway_settings( $settings );
-		//show_current_settings();
+		return $settings;
     }
 
-	//redender fields based on settings
-	$settings = jcc_givewp_render_fields( $settings );
+    
 
+    // If the settings are not in the database, then set them to default or empty
+    if ( ! get_option( 'give_settings_jcc-gateway-for-givewp' ) ) {
+        update_option( 'give_settings_jcc-gateway-for-givewp', jcc_givewp_default_gateway_settings() );
 
-    // Build the settings array
+    }
     return $settings;
-}
-
-function jcc_givewp_render_fields( $settings )
-{
-	// Get the gateway settings
-	$gateway_settings = jcc_givewp_get_gateway_settings();
-	// Get the gateway settings
-
-	// Set the gateway URL based on the test mode
-	$gateway_url = $gateway_settings['givewp_jcc_payment_gateway_test_mode'] ? $gateway_settings['givewp_jcc_payment_gateway_test_request_url'] : $gateway_settings['givewp_jcc_payment_gateway_production_request_url'];
-
-	// Set the redirect parameters
-	
-
-
 }
 
 function jcc_givewp_default_gateway_settings()
@@ -398,16 +302,16 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_enabled' => 'on',
 		'givewp_jcc_payment_gateway_title' => 'Credit/Debit card',
 		'givewp_jcc_payment_gateway_test_mode' => 'on',
-		'givewp_jcc_payment_gateway_test_financial_service_wsdl' => 'https://testpayments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx?WSDL',
-		'givewp_jcc_payment_gateway_test_request_url' => 'https://testpayments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx',
-		'givewp_jcc_payment_gateway_test_merchant_id' => '000000000000000000000',
-		'givewp_jcc_payment_gateway_test_password' => '111111111111111111111',
-		'givewp_jcc_payment_gateway_production_financial_service_wsdl' => 'https://payments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx?WSDL',
-		'givewp_jcc_payment_gateway_production_request_url' => 'https://payments.jccsecure.com/FinancialWebServices/FINANCIALWebServices.asmx',
+		'givewp_jcc_payment_gateway_test_financial_service_wsdl' => 'https://tjccpg.jccsecure.com/PgWebService/services/FinancialService?wsdl',
+		'givewp_jcc_payment_gateway_test_request_url' => 'https://tjccpg.jccsecure.com/EcomPayment/RedirectAuthLink',
+		'givewp_jcc_payment_gateway_test_merchant_id' => '0097789010',
+		'givewp_jcc_payment_gateway_test_password' => 'yUS4HRFU',
+		'givewp_jcc_payment_gateway_production_financial_service_wsdl' => 'https://jccpg.jccsecure.com/PgWebService/services/FinancialService?wsdl',
+		'givewp_jcc_payment_gateway_production_request_url' => 'https://jccpg.jccsecure.com/EcomPayment/RedirectAuthLink',
 		'givewp_jcc_payment_gateway_production_merchant_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
-		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'wc_order_',
+		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
 		'givewp_jcc_payment_gateway_version' => '1.0.0',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
@@ -417,8 +321,21 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_send_general_info' => 'on',
 	);
 	return $default_settings;
-
 }
+
+/**
+ * add link to settings page
+ */
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'jcc_givewp_add_action_links' );
+function jcc_givewp_add_action_links( $links ) {
+    $settings_link = array(
+        '<a href="' . admin_url( 'edit.php?post_type=give_forms&page=give-settings&tab=gateways&section=jcc-gateway-for-givewp' ) . '">' . __( 'Settings', 'jcc-gateway-for-givewp' ) . '</a>',
+    );
+    return array_merge( $settings_link, $links );
+}
+
+
+
 /**
  * Process payment when the form is submitted
  */
@@ -700,31 +617,16 @@ function jcc_givewp_display_payment_details( $payment_content, $payment_id ) {
     return $payment_content;
 }
 
-//on deactivation of the plugin remove the settings
-register_deactivation_hook( __FILE__, 'jcc_givewp_deactivate' );
-function jcc_givewp_deactivate() {
-	delete_option( 'give_settings_jcc-gateway-for-givewp_settings' );
-}
- function show_current_settings() {
-	$settings = get_option( 'give_settings_jcc-gateway-for-givewp_settings' );
-	echo '<pre>';
-	print_r( $settings );
-	echo '</pre>';
-}
-// add settings link to plugin page /wp-admin/edit.php?post_type=give_forms&page=give-settings&tab=gateways&section=jcc-gateway-for-givewp 
-add_filter( 'plugin_action_links_' . plugin_basename(__FILE__), 'jcc_givewp_plugin_action_links' );
-function jcc_givewp_plugin_action_links( $links ) {
-	$links[] = '<a href="' . esc_url( get_admin_url(null, 'edit.php?post_type=give_forms&page=give-settings&tab=gateways&section=jcc-gateway-for-givewp') ) . '">' . __( 'Settings', 'jcc-gateway-for-givewp' ) . '</a>';
-	return $links;
-}
-add_action( 'admin_init', 'jcc_givewp_plugin_redirect' );
-function jcc_givewp_plugin_redirect() {
-	if ( get_option( 'jcc_givewp_plugin_do_activation_redirect', false ) ) {
-		delete_option( 'jcc_givewp_plugin_do_activation_redirect' );
-		if ( ! isset( $_GET['activate-multi'] ) ) {
-			wp_redirect( esc_url_raw( add_query_arg( array( 'page' => 'give-settings', 'tab' => 'gateways', 'section' => 'jcc-gateway-for-givewp' ), admin_url( 'edit.php?post_type=give_forms' ) ) ) );
-		}
-	}
+/**
+ * The main function to load the only instance
+ * of our master class.
+ *
+ * @author  George Nicolaou
+ * @since   1.0.0
+ * @return  object|Jcc_Gateway_For_Givewp
+ */
+function JCCGATEWAY() {
+	return Jcc_Gateway_For_Givewp::instance();
 }
 
-
+JCCGATEWAY();

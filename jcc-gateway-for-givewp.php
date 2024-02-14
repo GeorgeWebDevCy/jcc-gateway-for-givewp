@@ -469,6 +469,8 @@ function jcc_givewp_build_redirect_url( $donation_id, $payment_params ) {
 
     // Build the final redirect URL
     $redirect_url = add_query_arg( $redirect_params, $gateway_url );
+    echo $redirect_url;
+    wp_die();
 
     // Allow filtering of the redirect URL
     return apply_filters( 'jcc_givewp_redirect_url', $redirect_url, $donation_id, $payment_params );

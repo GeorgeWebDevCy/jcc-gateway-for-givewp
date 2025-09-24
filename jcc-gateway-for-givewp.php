@@ -5,13 +5,13 @@
  * @package       JCCGATEWAY
  * @author        George Nicolaou
  * @license       gplv2
- * @version       1.0.2
+ * @version       1.0.3
  *
  * @wordpress-plugin
  * Plugin Name:   JCC Gateway For GiveWP
  * Plugin URI:    https://www.georgenicolaou.me/plugins/gncy-jcc-give-wp
  * Description:   JCC Payment Gateway for GiveWP
- * Version:       1.0.2
+ * Version:       1.0.3
  * Author:        George Nicolaou
  * Author URI:    https://www.georgenicolaou.me/
  * Text Domain:   jcc-gateway-for-givewp
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION',		'1.0.2' );
+define( 'JCCGATEWAY_VERSION',		'1.0.3' );
 
 // Plugin Root File
 define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
@@ -312,7 +312,7 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
 		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
-		'givewp_jcc_payment_gateway_version' => '1.0.2',
+		'givewp_jcc_payment_gateway_version' => '1.0.3',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
 		'givewp_jcc_payment_gateway_signature_method' => 'SHA1',
@@ -507,6 +507,12 @@ function jcc_givewp_process_payment( $purchase_data ) {
         give_send_back_to_checkout();
 
         return;
+    }
+
+    if ( function_exists( 'give_update_payment_meta' ) ) {
+        give_update_payment_meta( $donation_id, '_give_payment_currency', $currency );
+    } else {
+        update_post_meta( $donation_id, '_give_payment_currency', $currency );
     }
 
     // Prepare the payment parameters
@@ -748,6 +754,7 @@ add_action( 'init', 'jcc_givewp_backfill_missing_currency', 20 );
  * the validation fix introduced in version 1.0.2.
  *
  * @since 1.0.2
+ * @since 1.0.3 Also repopulates the donation currency meta to prevent GiveWP 3.0 fatal errors.
  *
  * @return void
  */
@@ -776,8 +783,10 @@ function jcc_givewp_backfill_missing_currency() {
     $donationmeta_table = $wpdb->prefix . 'give_donationmeta';
     $meta_table_exists  = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $donationmeta_table ) );
 
+    $queries_failed = false;
+
     if ( $meta_table_exists === $donationmeta_table ) {
-        $updated = $wpdb->query(
+        $currency_column_updated = $wpdb->query(
             $wpdb->prepare(
                 "UPDATE {$donations_table} donations
                 INNER JOIN {$donationmeta_table} meta ON donations.id = meta.donation_id
@@ -790,8 +799,58 @@ function jcc_givewp_backfill_missing_currency() {
                 'jcc-gateway-for-givewp'
             )
         );
+
+        if ( false === $currency_column_updated ) {
+            $queries_failed = true;
+        }
+
+        $currency_meta_updated = $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$donationmeta_table} meta
+                INNER JOIN {$donations_table} donations ON donations.id = meta.donation_id
+                SET meta.meta_value = %s
+                WHERE (meta.meta_value IS NULL OR meta.meta_value = '')
+                AND meta.meta_key = %s
+                AND donations.gateway = %s",
+                $default_currency,
+                '_give_payment_currency',
+                'jcc-gateway-for-givewp'
+            )
+        );
+
+        if ( false === $currency_meta_updated ) {
+            $queries_failed = true;
+        }
+
+        $missing_currency_meta_donations = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT donations.id
+                FROM {$donations_table} donations
+                LEFT JOIN {$donationmeta_table} meta
+                    ON donations.id = meta.donation_id
+                    AND meta.meta_key = %s
+                WHERE meta.meta_id IS NULL
+                AND donations.gateway = %s",
+                '_give_payment_currency',
+                'jcc-gateway-for-givewp'
+            )
+        );
+
+        if ( is_array( $missing_currency_meta_donations ) && ! empty( $missing_currency_meta_donations ) ) {
+            foreach ( $missing_currency_meta_donations as $donation_id ) {
+                $donation_id = (int) $donation_id;
+
+                if ( function_exists( 'give_update_payment_meta' ) ) {
+                    give_update_payment_meta( $donation_id, '_give_payment_currency', $default_currency );
+                } else {
+                    update_post_meta( $donation_id, '_give_payment_currency', $default_currency );
+                }
+            }
+        } elseif ( ! is_array( $missing_currency_meta_donations ) ) {
+            $queries_failed = true;
+        }
     } else {
-        $updated = $wpdb->query(
+        $currency_column_updated = $wpdb->query(
             $wpdb->prepare(
                 "UPDATE {$donations_table}
                 SET currency = %s
@@ -801,9 +860,13 @@ function jcc_givewp_backfill_missing_currency() {
                 'jcc-gateway-for-givewp'
             )
         );
+
+        if ( false === $currency_column_updated ) {
+            $queries_failed = true;
+        }
     }
 
-    if ( false !== $updated ) {
+    if ( ! $queries_failed ) {
         update_option( 'jcc_givewp_backfill_missing_currency', 1, false );
     }
 }

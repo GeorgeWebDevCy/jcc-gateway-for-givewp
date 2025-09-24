@@ -7,7 +7,7 @@ Tags:
 Requires at least: 
 Tested up to: 
 Requires PHP: 
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 License: GPLv2
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,10 @@ An answer to that question.
 4. Click on `Activate plugin`
 
 == Changelog ==
+
+= 1.0.6: September 28, 2025 =
+* Ensure the gateway records the correct GiveWP form ID by validating submitted identifiers against the donation form post type before logging and processing payments.
+* Harden donation currency detection so invalid filter results fall back to a safe default instead of triggering GiveWP fatal errors.
 
 = 1.0.5: September 27, 2025 =
 * Run the donation currency backfill immediately when the plugin loads so historical JCC donations receive a currency code before GiveWP queries them.

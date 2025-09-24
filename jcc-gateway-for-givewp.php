@@ -5,13 +5,13 @@
  * @package       JCCGATEWAY
  * @author        George Nicolaou
  * @license       gplv2
- * @version       1.0.5
+ * @version       1.0.6
  *
  * @wordpress-plugin
  * Plugin Name:   JCC Gateway For GiveWP
  * Plugin URI:    https://www.georgenicolaou.me/plugins/gncy-jcc-give-wp
  * Description:   JCC Payment Gateway for GiveWP
- * Version:       1.0.5
+ * Version:       1.0.6
  * Author:        George Nicolaou
  * Author URI:    https://www.georgenicolaou.me/
  * Text Domain:   jcc-gateway-for-givewp
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION',		'1.0.5' );
+define( 'JCCGATEWAY_VERSION',		'1.0.6' );
 
 // Plugin Root File
 define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
@@ -533,7 +533,7 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
 		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
-		'givewp_jcc_payment_gateway_version' => '1.0.5',
+                'givewp_jcc_payment_gateway_version' => '1.0.6',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
 		'givewp_jcc_payment_gateway_signature_method' => 'SHA1',
@@ -670,7 +670,113 @@ function jcc_givewp_get_donation_currency( $give_form_id, $post_data ) {
      * @param int    $give_form_id GiveWP form ID.
      * @param array  $post_data    Posted form data.
      */
-    return apply_filters( 'jcc_givewp_donation_currency', $currency, $give_form_id, $post_data );
+    $filtered_currency     = apply_filters( 'jcc_givewp_donation_currency', $currency, $give_form_id, $post_data );
+    $raw_filtered_currency = $filtered_currency;
+
+    if ( is_string( $filtered_currency ) || is_numeric( $filtered_currency ) ) {
+        $filtered_currency = strtoupper( trim( (string) $filtered_currency ) );
+        $filtered_currency = preg_replace( '/[^A-Z]/', '', $filtered_currency );
+    } else {
+        $filtered_currency = '';
+    }
+
+    if ( '' === $filtered_currency ) {
+        $fallback_currency = is_string( $currency ) ? strtoupper( trim( $currency ) ) : '';
+
+        if ( '' !== $fallback_currency ) {
+            $fallback_currency = preg_replace( '/[^A-Z]/', '', $fallback_currency );
+        }
+
+        if ( '' === $fallback_currency ) {
+            $fallback_currency = 'EUR';
+        }
+
+        if ( function_exists( 'jcc_givewp_log_event' ) ) {
+            jcc_givewp_log_event(
+                'Invalid currency code provided for the JCC donation. Falling back to the default.',
+                array(
+                    'give_form_id' => $give_form_id,
+                    'currency_raw' => is_scalar( $raw_filtered_currency ) ? (string) $raw_filtered_currency : gettype( $raw_filtered_currency ),
+                    'currency_fallback' => $fallback_currency,
+                ),
+                'warning'
+            );
+        }
+
+        return $fallback_currency;
+    }
+
+    return $filtered_currency;
+}
+
+
+
+/**
+ * Determine the GiveWP form ID associated with the current donation submission.
+ *
+ * @since 1.0.6
+ *
+ * @param array $purchase_data Data supplied by GiveWP when the form is submitted.
+ * @param array $post_data     Sanitized posted form data.
+ *
+ * @return int The resolved GiveWP form ID, or 0 when it cannot be determined.
+ */
+function jcc_givewp_determine_form_id( $purchase_data, $post_data ) {
+    $raw_candidates = array();
+
+    if ( is_array( $post_data ) ) {
+        foreach ( array( 'give-form-id', 'give_form_id', 'form-id', 'form_id' ) as $key ) {
+            if ( isset( $post_data[ $key ] ) ) {
+                $raw_candidates[] = $post_data[ $key ];
+            }
+        }
+    }
+
+    if ( is_array( $purchase_data ) ) {
+        foreach ( array( 'give_form_id', 'form_id' ) as $key ) {
+            if ( isset( $purchase_data[ $key ] ) ) {
+                $raw_candidates[] = $purchase_data[ $key ];
+            }
+        }
+    }
+
+    if ( empty( $raw_candidates ) ) {
+        return 0;
+    }
+
+    $candidates = array();
+
+    foreach ( $raw_candidates as $candidate ) {
+        if ( is_array( $candidate ) || is_object( $candidate ) ) {
+            continue;
+        }
+
+        if ( is_string( $candidate ) || is_numeric( $candidate ) ) {
+            $candidate = absint( $candidate );
+        } else {
+            continue;
+        }
+
+        if ( $candidate > 0 ) {
+            $candidates[] = $candidate;
+        }
+    }
+
+    if ( empty( $candidates ) ) {
+        return 0;
+    }
+
+    $candidates = array_values( array_unique( $candidates ) );
+
+    if ( function_exists( 'get_post_type' ) ) {
+        foreach ( $candidates as $candidate ) {
+            if ( 'give_forms' === get_post_type( $candidate ) ) {
+                return $candidate;
+            }
+        }
+    }
+
+    return (int) $candidates[0];
 }
 
 
@@ -682,15 +788,7 @@ add_action( 'give_gateway_jcc-gateway-for-givewp', 'jcc_givewp_process_payment' 
 function jcc_givewp_process_payment( $purchase_data ) {
     $post_data = isset( $purchase_data['post_data'] ) && is_array( $purchase_data['post_data'] ) ? $purchase_data['post_data'] : array();
 
-    $give_form_id = 0;
-
-    if ( isset( $purchase_data['give_form_id'] ) ) {
-        $give_form_id = absint( $purchase_data['give_form_id'] );
-    } elseif ( isset( $post_data['give-form-id'] ) ) {
-        $give_form_id = absint( $post_data['give-form-id'] );
-    } elseif ( isset( $post_data['give_form_id'] ) ) {
-        $give_form_id = absint( $post_data['give_form_id'] );
-    }
+    $give_form_id = jcc_givewp_determine_form_id( $purchase_data, $post_data );
 
     $currency = jcc_givewp_get_donation_currency( $give_form_id, $post_data );
 

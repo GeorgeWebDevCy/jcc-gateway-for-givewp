@@ -341,17 +341,41 @@ function jcc_givewp_add_action_links( $links ) {
  */
 add_action( 'give_gateway_jcc-gateway-for-givewp', 'jcc_givewp_process_payment' );
 function jcc_givewp_process_payment( $purchase_data ) {
+    $post_data = isset( $purchase_data['post_data'] ) && is_array( $purchase_data['post_data'] ) ? $purchase_data['post_data'] : array();
+
+    $give_form_id = 0;
+
+    if ( isset( $purchase_data['give_form_id'] ) ) {
+        $give_form_id = absint( $purchase_data['give_form_id'] );
+    } elseif ( isset( $post_data['give-form-id'] ) ) {
+        $give_form_id = absint( $post_data['give-form-id'] );
+    }
+
+    $currency = '';
+
+    if ( isset( $post_data['give-currency'] ) && '' !== $post_data['give-currency'] ) {
+        $currency = $post_data['give-currency'];
+    } elseif ( $give_form_id ) {
+        $currency = give_get_currency( $give_form_id );
+    } else {
+        $currency = give_get_currency();
+    }
+
+    $card_type = isset( $post_data['card-type'] ) ? $post_data['card-type'] : '';
+
+    $amount = isset( $purchase_data['price'] ) ? $purchase_data['price'] : 0;
+
     // Retrieve the payment data
     $payment_data = array(
-        'price'           => $purchase_data['price'],
-        'give_form_title' => $purchase_data['post_data']['give-form-title'],
-        'give_form_id'    => $purchase_data['post_data']['give-form-id'],
-        'give_price_id'   => $purchase_data['post_data']['give-price-id'],
-        'date'            => $purchase_data['date'],
-        'user_email'      => $purchase_data['user_email'],
-        'purchase_key'    => $purchase_data['purchase_key'],
-        'currency'        => give_get_currency( $purchase_data['give_form_id'] ),
-        'user_info'       => $purchase_data['user_info'],
+        'price'           => $amount,
+        'give_form_title' => isset( $post_data['give-form-title'] ) ? $post_data['give-form-title'] : '',
+        'give_form_id'    => $give_form_id,
+        'give_price_id'   => isset( $post_data['give-price-id'] ) ? $post_data['give-price-id'] : '',
+        'date'            => isset( $purchase_data['date'] ) ? $purchase_data['date'] : '',
+        'user_email'      => isset( $purchase_data['user_email'] ) ? $purchase_data['user_email'] : '',
+        'purchase_key'    => isset( $purchase_data['purchase_key'] ) ? $purchase_data['purchase_key'] : '',
+        'currency'        => $currency,
+        'user_info'       => isset( $purchase_data['user_info'] ) ? $purchase_data['user_info'] : array(),
         'status'          => 'publish',
     );
 
@@ -372,10 +396,10 @@ function jcc_givewp_process_payment( $purchase_data ) {
 
     // Prepare the payment parameters
     $payment_params = array(
-        'total'      => give_format_amount( $purchase_data['price'] ),
-        'currency'   => $purchase_data['post_data']['give-currency'],
+        'total'      => give_format_amount( $amount ),
+        'currency'   => $currency,
         'language'   => 'en',
-        'method'     => $purchase_data['post_data']['card-type'],
+        'method'     => $card_type,
         'merchantID' => $gateway_settings['givewp_jcc_payment_gateway_test_mode'] ? $gateway_settings['givewp_jcc_payment_gateway_test_merchant_id'] : $gateway_settings['givewp_jcc_payment_gateway_production_merchant_id'],
     );
 

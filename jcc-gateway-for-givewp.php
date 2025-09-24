@@ -5,13 +5,13 @@
  * @package       JCCGATEWAY
  * @author        George Nicolaou
  * @license       gplv2
- * @version       1.0.0
+ * @version       1.0.1
  *
  * @wordpress-plugin
  * Plugin Name:   JCC Gateway For GiveWP
  * Plugin URI:    https://www.georgenicolaou.me/plugins/gncy-jcc-give-wp
  * Description:   JCC Payment Gateway for GiveWP
- * Version:       1.0.0
+ * Version:       1.0.1
  * Author:        George Nicolaou
  * Author URI:    https://www.georgenicolaou.me/
  * Text Domain:   jcc-gateway-for-givewp
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION',		'1.0.0' );
+define( 'JCCGATEWAY_VERSION',		'1.0.1' );
 
 // Plugin Root File
 define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
@@ -312,7 +312,7 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
 		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
-		'givewp_jcc_payment_gateway_version' => '1.0.0',
+		'givewp_jcc_payment_gateway_version' => '1.0.1',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
 		'givewp_jcc_payment_gateway_signature_method' => 'SHA1',
@@ -332,6 +332,64 @@ function jcc_givewp_add_action_links( $links ) {
         '<a href="' . admin_url( 'edit.php?post_type=give_forms&page=give-settings&tab=gateways&section=jcc-gateway-for-givewp' ) . '">' . __( 'Settings', 'jcc-gateway-for-givewp' ) . '</a>',
     );
     return array_merge( $settings_link, $links );
+}
+
+
+/**
+ * Determine the language code that should be sent to JCC based on the current form and active multilingual plugins.
+ *
+ * @since 1.0.1
+ *
+ * @param int $give_form_id GiveWP form ID.
+ *
+ * @return string Two letter language code.
+ */
+function jcc_givewp_get_payment_language( $give_form_id ) {
+    $language = '';
+
+    if ( $give_form_id ) {
+        $language_details = apply_filters( 'wpml_post_language_details', null, $give_form_id );
+
+        if ( is_array( $language_details ) && ! empty( $language_details['language_code'] ) ) {
+            $language = $language_details['language_code'];
+        }
+    }
+
+    if ( ! $language && defined( 'ICL_LANGUAGE_CODE' ) && ICL_LANGUAGE_CODE ) {
+        $language = ICL_LANGUAGE_CODE;
+    }
+
+    if ( ! $language && function_exists( 'pll_current_language' ) ) {
+        $pll_language = pll_current_language();
+
+        if ( $pll_language ) {
+            $language = $pll_language;
+        }
+    }
+
+    if ( ! $language ) {
+        $locale = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+
+        if ( $locale ) {
+            $language = substr( $locale, 0, 2 );
+        }
+    }
+
+    $language = strtolower( substr( preg_replace( '/[^a-zA-Z]/', '', (string) $language ), 0, 2 ) );
+
+    if ( ! $language ) {
+        $language = 'en';
+    }
+
+    /**
+     * Filters the language code that is sent to the JCC gateway.
+     *
+     * @since 1.0.1
+     *
+     * @param string $language     Two letter language code.
+     * @param int    $give_form_id GiveWP form ID.
+     */
+    return apply_filters( 'jcc_givewp_payment_language', $language, $give_form_id );
 }
 
 
@@ -398,7 +456,7 @@ function jcc_givewp_process_payment( $purchase_data ) {
     $payment_params = array(
         'total'      => give_format_amount( $amount ),
         'currency'   => $currency,
-        'language'   => 'en',
+        'language'   => jcc_givewp_get_payment_language( $give_form_id ),
         'method'     => $card_type,
         'merchantID' => $gateway_settings['givewp_jcc_payment_gateway_test_mode'] ? $gateway_settings['givewp_jcc_payment_gateway_test_merchant_id'] : $gateway_settings['givewp_jcc_payment_gateway_production_merchant_id'],
     );

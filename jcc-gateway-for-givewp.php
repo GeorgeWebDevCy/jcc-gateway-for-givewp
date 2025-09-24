@@ -5,13 +5,13 @@
  * @package       JCCGATEWAY
  * @author        George Nicolaou
  * @license       gplv2
- * @version       1.0.6
+ * @version       1.0.7
  *
  * @wordpress-plugin
  * Plugin Name:   JCC Gateway For GiveWP
  * Plugin URI:    https://www.georgenicolaou.me/plugins/gncy-jcc-give-wp
  * Description:   JCC Payment Gateway for GiveWP
- * Version:       1.0.6
+ * Version:       1.0.7
  * Author:        George Nicolaou
  * Author URI:    https://www.georgenicolaou.me/
  * Text Domain:   jcc-gateway-for-givewp
@@ -29,7 +29,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION',		'1.0.6' );
+define( 'JCCGATEWAY_VERSION',		'1.0.7' );
+
+// GiveWP form ID forced for JCC donations.
+define( 'JCCGATEWAY_GIVE_FORM_ID',	7 );
 
 // Plugin Root File
 define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
@@ -533,7 +536,7 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
 		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
-                'givewp_jcc_payment_gateway_version' => '1.0.6',
+                'givewp_jcc_payment_gateway_version' => '1.0.7',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
 		'givewp_jcc_payment_gateway_signature_method' => 'SHA1',
@@ -715,6 +718,7 @@ function jcc_givewp_get_donation_currency( $give_form_id, $post_data ) {
  * Determine the GiveWP form ID associated with the current donation submission.
  *
  * @since 1.0.6
+ * @since 1.0.7 Allow forcing the GiveWP form ID via a constant/filter.
  *
  * @param array $purchase_data Data supplied by GiveWP when the form is submitted.
  * @param array $post_data     Sanitized posted form data.
@@ -722,6 +726,12 @@ function jcc_givewp_get_donation_currency( $give_form_id, $post_data ) {
  * @return int The resolved GiveWP form ID, or 0 when it cannot be determined.
  */
 function jcc_givewp_determine_form_id( $purchase_data, $post_data ) {
+    $forced_form_id = (int) apply_filters( 'jcc_givewp_forced_form_id', JCCGATEWAY_GIVE_FORM_ID );
+
+    if ( $forced_form_id > 0 ) {
+        return $forced_form_id;
+    }
+
     $raw_candidates = array();
 
     if ( is_array( $post_data ) ) {

@@ -7,7 +7,7 @@ Tags:
 Requires at least: 
 Tested up to: 
 Requires PHP: 
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,9 @@ An answer to that question.
 4. Click on `Activate plugin`
 
 == Changelog ==
+
+= 1.0.1: September 24, 2025 =
+* Improve compatibility with multilingual forms by detecting the correct language when redirecting donors to JCC.
 
 = 1.0.0: January 16, 2024 =
 * Birthday of JCC Gateway For GiveWP

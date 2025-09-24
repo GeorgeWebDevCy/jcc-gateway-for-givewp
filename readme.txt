@@ -7,7 +7,7 @@ Tags:
 Requires at least: 
 Tested up to: 
 Requires PHP: 
-Stable tag: 1.0.4
+Stable tag: 1.0.5
 License: GPLv2
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,10 @@ An answer to that question.
 4. Click on `Activate plugin`
 
 == Changelog ==
+
+= 1.0.5: September 27, 2025 =
+* Run the donation currency backfill immediately when the plugin loads so historical JCC donations receive a currency code before GiveWP queries them.
+* Introduce an admin-facing JCC Gateway Logs screen that records key gateway events to aid troubleshooting.
 
 = 1.0.4: September 26, 2025 =
 * Set the default JCC donation currency fallback to EUR so Euro remains the standard when no other value is provided.

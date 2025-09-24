@@ -5,13 +5,13 @@
  * @package       JCCGATEWAY
  * @author        George Nicolaou
  * @license       gplv2
- * @version       1.0.4
+ * @version       1.0.5
  *
  * @wordpress-plugin
  * Plugin Name:   JCC Gateway For GiveWP
  * Plugin URI:    https://www.georgenicolaou.me/plugins/gncy-jcc-give-wp
  * Description:   JCC Payment Gateway for GiveWP
- * Version:       1.0.4
+ * Version:       1.0.5
  * Author:        George Nicolaou
  * Author URI:    https://www.georgenicolaou.me/
  * Text Domain:   jcc-gateway-for-givewp
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION',		'1.0.4' );
+define( 'JCCGATEWAY_VERSION',		'1.0.5' );
 
 // Plugin Root File
 define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
@@ -42,6 +42,12 @@ define( 'JCCGATEWAY_PLUGIN_DIR',	plugin_dir_path( JCCGATEWAY_PLUGIN_FILE ) );
 
 // Plugin Folder URL
 define( 'JCCGATEWAY_PLUGIN_URL',	plugin_dir_url( JCCGATEWAY_PLUGIN_FILE ) );
+
+// Option name used to persist the plugin activity log.
+define( 'JCCGATEWAY_LOG_OPTION',	'jcc_givewp_logs' );
+
+// Default maximum number of log entries to persist.
+define( 'JCCGATEWAY_LOG_LIMIT',	200 );
 
 /**
  * Load the main class for the core functionality
@@ -58,6 +64,221 @@ $myUpdateChecker = PucFactory::buildUpdateChecker(
     'jcc-gateway-for-givewp'
 );
 $myUpdateChecker->setBranch('main');
+
+
+/**
+ * Persist a plugin log entry so administrators can review gateway activity.
+ *
+ * @since 1.0.5
+ *
+ * @param string $message Log message.
+ * @param array  $context Additional contextual data to assist with debugging.
+ * @param string $level   Severity level (info, warning, error).
+ *
+ * @return void
+ */
+function jcc_givewp_log_event( $message, $context = array(), $level = 'info' ) {
+    if ( ! is_string( $message ) ) {
+        return;
+    }
+
+    $message = trim( wp_strip_all_tags( $message ) );
+
+    if ( '' === $message ) {
+        return;
+    }
+
+    $level = strtoupper( preg_replace( '/[^a-z]/i', '', (string) $level ) );
+
+    if ( '' === $level ) {
+        $level = 'INFO';
+    }
+
+    $sanitized_context = array();
+
+    if ( is_array( $context ) ) {
+        $index = 0;
+
+        foreach ( $context as $key => $value ) {
+            $index++;
+            $key = is_string( $key ) ? sanitize_key( $key ) : 'item_' . $index;
+
+            if ( '' === $key ) {
+                $key = 'item_' . $index;
+            }
+
+            if ( is_scalar( $value ) || ( is_object( $value ) && method_exists( $value, '__toString' ) ) ) {
+                $sanitized_context[ $key ] = wp_strip_all_tags( (string) $value );
+            } else {
+                $sanitized_context[ $key ] = wp_json_encode( $value );
+            }
+        }
+    }
+
+    $logs = get_option( JCCGATEWAY_LOG_OPTION, array() );
+
+    if ( ! is_array( $logs ) ) {
+        $logs = array();
+    }
+
+    array_unshift(
+        $logs,
+        array(
+            'time'    => current_time( 'timestamp' ),
+            'level'   => $level,
+            'message' => $message,
+            'context' => $sanitized_context,
+        )
+    );
+
+    $limit = (int) apply_filters( 'jcc_givewp_log_limit', JCCGATEWAY_LOG_LIMIT );
+
+    if ( $limit > 0 && count( $logs ) > $limit ) {
+        $logs = array_slice( $logs, 0, $limit );
+    }
+
+    update_option( JCCGATEWAY_LOG_OPTION, $logs, false );
+}
+
+/**
+ * Retrieve the stored gateway log entries.
+ *
+ * @since 1.0.5
+ *
+ * @return array
+ */
+function jcc_givewp_get_log_entries() {
+    $logs = get_option( JCCGATEWAY_LOG_OPTION, array() );
+
+    if ( ! is_array( $logs ) ) {
+        return array();
+    }
+
+    return $logs;
+}
+
+/**
+ * Register the admin menu where gateway activity logs are displayed.
+ *
+ * @since 1.0.5
+ *
+ * @return void
+ */
+add_action( 'admin_menu', 'jcc_givewp_register_logs_admin_menu' );
+function jcc_givewp_register_logs_admin_menu() {
+    add_menu_page(
+        __( 'JCC Gateway Logs', 'jcc-gateway-for-givewp' ),
+        __( 'JCC Gateway Logs', 'jcc-gateway-for-givewp' ),
+        'manage_options',
+        'jcc-givewp-logs',
+        'jcc_givewp_render_logs_page',
+        'dashicons-clipboard',
+        56
+    );
+}
+
+/**
+ * Handle the submission that clears the stored log entries.
+ *
+ * @since 1.0.5
+ *
+ * @return void
+ */
+add_action( 'admin_post_jcc_givewp_clear_logs', 'jcc_givewp_handle_clear_logs' );
+function jcc_givewp_handle_clear_logs() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( esc_html__( 'You do not have permission to clear the JCC Gateway log.', 'jcc-gateway-for-givewp' ) );
+    }
+
+    check_admin_referer( 'jcc_givewp_clear_logs' );
+
+    delete_option( JCCGATEWAY_LOG_OPTION );
+
+    $redirect_url = add_query_arg(
+        array(
+            'page'                    => 'jcc-givewp-logs',
+            'jcc_givewp_logs_cleared' => '1',
+        ),
+        admin_url( 'admin.php' )
+    );
+
+    wp_safe_redirect( $redirect_url );
+    exit;
+}
+
+/**
+ * Render the admin screen that displays stored gateway activity logs.
+ *
+ * @since 1.0.5
+ *
+ * @return void
+ */
+function jcc_givewp_render_logs_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+
+    $logs        = jcc_givewp_get_log_entries();
+    $date_format = get_option( 'date_format' ) . ' ' . get_option( 'time_format' );
+
+    echo '<div class="wrap">';
+    echo '<h1>' . esc_html__( 'JCC Gateway Logs', 'jcc-gateway-for-givewp' ) . '</h1>';
+
+    if ( isset( $_GET['jcc_givewp_logs_cleared'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'The gateway log was cleared successfully.', 'jcc-gateway-for-givewp' ) . '</p></div>';
+    }
+
+    echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="margin-bottom:20px;">';
+    wp_nonce_field( 'jcc_givewp_clear_logs' );
+    echo '<input type="hidden" name="action" value="jcc_givewp_clear_logs" />';
+    submit_button( __( 'Clear Logs', 'jcc-gateway-for-givewp' ), 'delete', 'jcc-givewp-clear-logs', false );
+    echo '</form>';
+
+    echo '<table class="widefat fixed striped">';
+    echo '<thead><tr>';
+    echo '<th scope="col">' . esc_html__( 'Date', 'jcc-gateway-for-givewp' ) . '</th>';
+    echo '<th scope="col">' . esc_html__( 'Level', 'jcc-gateway-for-givewp' ) . '</th>';
+    echo '<th scope="col">' . esc_html__( 'Message', 'jcc-gateway-for-givewp' ) . '</th>';
+    echo '<th scope="col">' . esc_html__( 'Context', 'jcc-gateway-for-givewp' ) . '</th>';
+    echo '</tr></thead>';
+
+    echo '<tbody>';
+
+    if ( empty( $logs ) ) {
+        echo '<tr><td colspan="4">' . esc_html__( 'No gateway activity has been logged yet.', 'jcc-gateway-for-givewp' ) . '</td></tr>';
+    } else {
+        foreach ( $logs as $entry ) {
+            $timestamp = isset( $entry['time'] ) ? absint( $entry['time'] ) : 0;
+            $level     = isset( $entry['level'] ) ? $entry['level'] : 'INFO';
+            $message   = isset( $entry['message'] ) ? $entry['message'] : '';
+            $context   = isset( $entry['context'] ) && is_array( $entry['context'] ) ? $entry['context'] : array();
+
+            $formatted_time = $timestamp ? ( function_exists( 'wp_date' ) ? wp_date( $date_format, $timestamp ) : date_i18n( $date_format, $timestamp ) ) : '';
+
+            echo '<tr>';
+            echo '<td>' . esc_html( $formatted_time ) . '</td>';
+            echo '<td>' . esc_html( strtoupper( $level ) ) . '</td>';
+            echo '<td>' . esc_html( $message ) . '</td>';
+            echo '<td>';
+
+            if ( ! empty( $context ) ) {
+                foreach ( $context as $context_key => $context_value ) {
+                    echo '<div><strong>' . esc_html( $context_key ) . ':</strong> ' . esc_html( $context_value ) . '</div>';
+                }
+            } else {
+                echo '&mdash;';
+            }
+
+            echo '</td>';
+            echo '</tr>';
+        }
+    }
+
+    echo '</tbody>';
+    echo '</table>';
+    echo '</div>';
+}
+
 
 
 //Make sure Givewp is active and if not show a notice amd keep it inactive until Givewp is active
@@ -312,7 +533,7 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
 		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
-		'givewp_jcc_payment_gateway_version' => '1.0.4',
+		'givewp_jcc_payment_gateway_version' => '1.0.5',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
 		'givewp_jcc_payment_gateway_signature_method' => 'SHA1',
@@ -479,7 +700,18 @@ function jcc_givewp_process_payment( $purchase_data ) {
 
     $card_type = isset( $post_data['card-type'] ) ? $post_data['card-type'] : '';
 
-    $amount = isset( $purchase_data['price'] ) ? $purchase_data['price'] : 0;
+    $amount            = isset( $purchase_data['price'] ) ? $purchase_data['price'] : 0;
+    $formatted_amount  = give_format_amount( $amount );
+
+    jcc_givewp_log_event(
+        'Processing GiveWP donation via the JCC gateway.',
+        array(
+            'give_form_id' => $give_form_id,
+            'currency'     => $currency,
+            'amount'       => $formatted_amount,
+            'mode'         => $mode,
+        )
+    );
 
     // Retrieve the payment data
     $payment_data = array(
@@ -502,12 +734,34 @@ function jcc_givewp_process_payment( $purchase_data ) {
 
     // Check if the payment was processed successfully
     if ( ! $donation_id ) {
+        jcc_givewp_log_event(
+            'Failed to insert the pending GiveWP donation record for JCC processing.',
+            array(
+                'give_form_id' => $give_form_id,
+                'currency'     => $currency,
+                'amount'       => $formatted_amount,
+                'mode'         => $mode,
+            ),
+            'error'
+        );
+
         // Payment failed, show an error
         give_set_error( 'jcc_givewp_payment_failed', __( 'Payment failed while processing. Please try again.', 'jcc-gateway-for-givewp' ) );
         give_send_back_to_checkout();
 
         return;
     }
+
+    jcc_givewp_log_event(
+        'Created pending JCC donation awaiting gateway redirection.',
+        array(
+            'donation_id' => $donation_id,
+            'give_form_id'=> $give_form_id,
+            'currency'    => $currency,
+            'amount'      => $formatted_amount,
+            'mode'        => $mode,
+        )
+    );
 
     if ( function_exists( 'give_update_payment_meta' ) ) {
         give_update_payment_meta( $donation_id, '_give_payment_currency', $currency );
@@ -521,7 +775,7 @@ function jcc_givewp_process_payment( $purchase_data ) {
         : ( isset( $gateway_settings['givewp_jcc_payment_gateway_production_merchant_id'] ) ? $gateway_settings['givewp_jcc_payment_gateway_production_merchant_id'] : '' );
 
     $payment_params = array(
-        'total'      => give_format_amount( $amount ),
+        'total'      => $formatted_amount,
         'currency'   => $currency,
         'language'   => jcc_givewp_get_payment_language( $give_form_id ),
         'method'     => $card_type,
@@ -742,6 +996,7 @@ function jcc_givewp_process_ipn() {
     }
 }
 
+add_action( 'plugins_loaded', 'jcc_givewp_backfill_missing_currency', 1 );
 add_action( 'init', 'jcc_givewp_backfill_missing_currency', 20 );
 
 /**
@@ -780,20 +1035,31 @@ function jcc_givewp_backfill_missing_currency() {
         $default_currency = 'EUR';
     }
 
+    jcc_givewp_log_event(
+        'Running currency backfill for historical JCC donations.',
+        array(
+            'default_currency' => $default_currency,
+        )
+    );
+
     $donationmeta_table = $wpdb->prefix . 'give_donationmeta';
     $meta_table_exists  = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $donationmeta_table ) );
 
-    $queries_failed = false;
+    $queries_failed                   = false;
+    $donation_currency_updates        = 0;
+    $currency_meta_updates            = 0;
+    $currency_meta_backfills          = 0;
+    $legacy_donation_currency_updates = 0;
 
     if ( $meta_table_exists === $donationmeta_table ) {
         $currency_column_updated = $wpdb->query(
             $wpdb->prepare(
-                "UPDATE {$donations_table} donations
-                INNER JOIN {$donationmeta_table} meta ON donations.id = meta.donation_id
-                SET donations.currency = %s
-                WHERE (donations.currency IS NULL OR donations.currency = '')
-                AND meta.meta_key = %s
-                AND meta.meta_value = %s",
+                "UPDATE {$donations_table} donations"
+                . " INNER JOIN {$donationmeta_table} meta ON donations.id = meta.donation_id"
+                . " SET donations.currency = %s"
+                . " WHERE (donations.currency IS NULL OR donations.currency = '')"
+                . " AND meta.meta_key = %s"
+                . " AND meta.meta_value = %s",
                 $default_currency,
                 '_give_payment_gateway',
                 'jcc-gateway-for-givewp'
@@ -802,16 +1068,19 @@ function jcc_givewp_backfill_missing_currency() {
 
         if ( false === $currency_column_updated ) {
             $queries_failed = true;
+            jcc_givewp_log_event( 'Failed to normalise the donations currency column for JCC payments.', array(), 'error' );
+        } else {
+            $donation_currency_updates = (int) $currency_column_updated;
         }
 
         $currency_meta_updated = $wpdb->query(
             $wpdb->prepare(
-                "UPDATE {$donationmeta_table} meta
-                INNER JOIN {$donations_table} donations ON donations.id = meta.donation_id
-                SET meta.meta_value = %s
-                WHERE (meta.meta_value IS NULL OR meta.meta_value = '')
-                AND meta.meta_key = %s
-                AND donations.gateway = %s",
+                "UPDATE {$donationmeta_table} meta"
+                . " INNER JOIN {$donations_table} donations ON donations.id = meta.donation_id"
+                . " SET meta.meta_value = %s"
+                . " WHERE (meta.meta_value IS NULL OR meta.meta_value = '')"
+                . " AND meta.meta_key = %s"
+                . " AND donations.gateway = %s",
                 $default_currency,
                 '_give_payment_currency',
                 'jcc-gateway-for-givewp'
@@ -820,17 +1089,20 @@ function jcc_givewp_backfill_missing_currency() {
 
         if ( false === $currency_meta_updated ) {
             $queries_failed = true;
+            jcc_givewp_log_event( 'Failed to normalise the donation currency meta for JCC payments.', array(), 'error' );
+        } else {
+            $currency_meta_updates = (int) $currency_meta_updated;
         }
 
         $missing_currency_meta_donations = $wpdb->get_col(
             $wpdb->prepare(
-                "SELECT donations.id
-                FROM {$donations_table} donations
-                LEFT JOIN {$donationmeta_table} meta
-                    ON donations.id = meta.donation_id
-                    AND meta.meta_key = %s
-                WHERE meta.meta_id IS NULL
-                AND donations.gateway = %s",
+                "SELECT donations.id"
+                . " FROM {$donations_table} donations"
+                . " LEFT JOIN {$donationmeta_table} meta"
+                . " ON donations.id = meta.donation_id"
+                . " AND meta.meta_key = %s"
+                . " WHERE meta.meta_id IS NULL"
+                . " AND donations.gateway = %s",
                 '_give_payment_currency',
                 'jcc-gateway-for-givewp'
             )
@@ -846,16 +1118,19 @@ function jcc_givewp_backfill_missing_currency() {
                     update_post_meta( $donation_id, '_give_payment_currency', $default_currency );
                 }
             }
+
+            $currency_meta_backfills = count( $missing_currency_meta_donations );
         } elseif ( ! is_array( $missing_currency_meta_donations ) ) {
             $queries_failed = true;
+            jcc_givewp_log_event( 'Failed to identify donations that require currency meta backfill.', array(), 'error' );
         }
     } else {
         $currency_column_updated = $wpdb->query(
             $wpdb->prepare(
-                "UPDATE {$donations_table}
-                SET currency = %s
-                WHERE (currency IS NULL OR currency = '')
-                AND gateway = %s",
+                "UPDATE {$donations_table}"
+                . " SET currency = %s"
+                . " WHERE (currency IS NULL OR currency = '')"
+                . " AND gateway = %s",
                 $default_currency,
                 'jcc-gateway-for-givewp'
             )
@@ -863,13 +1138,36 @@ function jcc_givewp_backfill_missing_currency() {
 
         if ( false === $currency_column_updated ) {
             $queries_failed = true;
+            jcc_givewp_log_event( 'Failed to normalise the legacy donation currency column for JCC payments.', array(), 'error' );
+        } else {
+            $legacy_donation_currency_updates = (int) $currency_column_updated;
         }
     }
 
     if ( ! $queries_failed ) {
         update_option( 'jcc_givewp_backfill_missing_currency', 1, false );
+
+        jcc_givewp_log_event(
+            'Completed the JCC donation currency backfill.',
+            array(
+                'default_currency'         => $default_currency,
+                'donation_rows_normalised' => $donation_currency_updates,
+                'currency_meta_normalised' => $currency_meta_updates,
+                'currency_meta_backfilled' => $currency_meta_backfills,
+                'legacy_rows_normalised'   => $legacy_donation_currency_updates,
+            )
+        );
+    } else {
+        jcc_givewp_log_event(
+            'The JCC donation currency backfill did not finish successfully.',
+            array(
+                'default_currency' => $default_currency,
+            ),
+            'error'
+        );
     }
 }
+
 
 /**
  * Display donation details in the admin

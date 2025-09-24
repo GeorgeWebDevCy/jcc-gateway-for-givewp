@@ -7,7 +7,7 @@ Tags:
 Requires at least: 
 Tested up to: 
 Requires PHP: 
-Stable tag: 1.0.3
+Stable tag: 1.0.4
 License: GPLv2
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,9 @@ An answer to that question.
 4. Click on `Activate plugin`
 
 == Changelog ==
+
+= 1.0.4: September 26, 2025 =
+* Set the default JCC donation currency fallback to EUR so Euro remains the standard when no other value is provided.
 
 = 1.0.3: September 25, 2025 =
 * Ensure the `_give_payment_currency` metadata is saved for every new JCC donation so GiveWP's Money value object always receives a valid currency code.

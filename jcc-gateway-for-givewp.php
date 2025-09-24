@@ -5,13 +5,13 @@
  * @package       JCCGATEWAY
  * @author        George Nicolaou
  * @license       gplv2
- * @version       1.0.3
+ * @version       1.0.4
  *
  * @wordpress-plugin
  * Plugin Name:   JCC Gateway For GiveWP
  * Plugin URI:    https://www.georgenicolaou.me/plugins/gncy-jcc-give-wp
  * Description:   JCC Payment Gateway for GiveWP
- * Version:       1.0.3
+ * Version:       1.0.4
  * Author:        George Nicolaou
  * Author URI:    https://www.georgenicolaou.me/
  * Text Domain:   jcc-gateway-for-givewp
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION',		'1.0.3' );
+define( 'JCCGATEWAY_VERSION',		'1.0.4' );
 
 // Plugin Root File
 define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
@@ -312,7 +312,7 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
 		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
-		'givewp_jcc_payment_gateway_version' => '1.0.3',
+		'givewp_jcc_payment_gateway_version' => '1.0.4',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
 		'givewp_jcc_payment_gateway_signature_method' => 'SHA1',
@@ -422,12 +422,12 @@ function jcc_givewp_get_donation_currency( $give_form_id, $post_data ) {
     }
 
     if ( function_exists( 'give_get_option' ) ) {
-        $currency_candidates[] = give_get_option( 'currency', 'USD' );
+        $currency_candidates[] = give_get_option( 'currency', 'EUR' );
     }
 
-    $currency_candidates[] = 'USD';
+    $currency_candidates[] = 'EUR';
 
-    $currency = 'USD';
+    $currency = 'EUR';
 
     foreach ( $currency_candidates as $candidate ) {
         if ( is_string( $candidate ) || is_numeric( $candidate ) ) {
@@ -777,7 +777,7 @@ function jcc_givewp_backfill_missing_currency() {
     $default_currency = jcc_givewp_get_donation_currency( 0, array() );
 
     if ( ! is_string( $default_currency ) || '' === $default_currency ) {
-        $default_currency = 'USD';
+        $default_currency = 'EUR';
     }
 
     $donationmeta_table = $wpdb->prefix . 'give_donationmeta';

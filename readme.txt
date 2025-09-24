@@ -7,7 +7,7 @@ Tags:
 Requires at least: 
 Tested up to: 
 Requires PHP: 
-Stable tag: 1.0.6
+Stable tag: 1.0.7
 License: GPLv2
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,9 @@ An answer to that question.
 4. Click on `Activate plugin`
 
 == Changelog ==
+
+= 1.0.7: October 1, 2025 =
+* Force the JCC gateway to always use GiveWP form ID 7 to keep transactions aligned with the configured JCC merchant account.
 
 = 1.0.6: September 28, 2025 =
 * Ensure the gateway records the correct GiveWP form ID by validating submitted identifiers against the donation form post type before logging and processing payments.

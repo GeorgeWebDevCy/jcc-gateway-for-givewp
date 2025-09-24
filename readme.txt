@@ -7,7 +7,7 @@ Tags:
 Requires at least: 
 Tested up to: 
 Requires PHP: 
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,10 @@ An answer to that question.
 4. Click on `Activate plugin`
 
 == Changelog ==
+
+= 1.0.2: September 24, 2025 =
+* Prevent fatal errors in GiveWP 3.0+ by always storing a valid currency code with JCC donations and normalising incoming form data.
+* Automatically backfill the currency for historical JCC donations that were saved without a currency value.
 
 = 1.0.1: September 24, 2025 =
 * Improve compatibility with multilingual forms by detecting the correct language when redirecting donors to JCC.

@@ -5,13 +5,13 @@
  * @package       JCCGATEWAY
  * @author        George Nicolaou
  * @license       gplv2
- * @version       1.0.1
+ * @version       1.0.2
  *
  * @wordpress-plugin
  * Plugin Name:   JCC Gateway For GiveWP
  * Plugin URI:    https://www.georgenicolaou.me/plugins/gncy-jcc-give-wp
  * Description:   JCC Payment Gateway for GiveWP
- * Version:       1.0.1
+ * Version:       1.0.2
  * Author:        George Nicolaou
  * Author URI:    https://www.georgenicolaou.me/
  * Text Domain:   jcc-gateway-for-givewp
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JCCGATEWAY_NAME',			'JCC Gateway For GiveWP' );
 
 // Plugin version
-define( 'JCCGATEWAY_VERSION',		'1.0.1' );
+define( 'JCCGATEWAY_VERSION',		'1.0.2' );
 
 // Plugin Root File
 define( 'JCCGATEWAY_PLUGIN_FILE',	__FILE__ );
@@ -312,7 +312,7 @@ function jcc_givewp_default_gateway_settings()
 		'givewp_jcc_payment_gateway_production_password' => '111111111111111111111',
 		'givewp_jcc_payment_gateway_custom_order_id' => 'Alphanumeric1',
 		'givewp_jcc_payment_gateway_merchant_order_id_prefix' => 'give_order_',
-		'givewp_jcc_payment_gateway_version' => '1.0.1',
+		'givewp_jcc_payment_gateway_version' => '1.0.2',
 		'givewp_jcc_payment_gateway_acquirer_id' => '000000000000000000000',
 		'givewp_jcc_payment_gateway_capture_flag' => 'A',
 		'givewp_jcc_payment_gateway_signature_method' => 'SHA1',
@@ -392,6 +392,66 @@ function jcc_givewp_get_payment_language( $give_form_id ) {
     return apply_filters( 'jcc_givewp_payment_language', $language, $give_form_id );
 }
 
+/**
+ * Determine the currency code that should be stored with the donation.
+ *
+ * @since 1.0.2
+ *
+ * @param int   $give_form_id GiveWP form ID.
+ * @param array $post_data    Posted form data.
+ *
+ * @return string Three letter currency code.
+ */
+function jcc_givewp_get_donation_currency( $give_form_id, $post_data ) {
+    $currency_candidates = array();
+
+    if ( isset( $post_data['give-currency'] ) && '' !== $post_data['give-currency'] ) {
+        $currency_candidates[] = $post_data['give-currency'];
+    }
+
+    if ( isset( $post_data['give_currency'] ) && '' !== $post_data['give_currency'] ) {
+        $currency_candidates[] = $post_data['give_currency'];
+    }
+
+    if ( $give_form_id && function_exists( 'give_get_currency' ) ) {
+        $currency_candidates[] = give_get_currency( $give_form_id );
+    }
+
+    if ( function_exists( 'give_get_currency' ) ) {
+        $currency_candidates[] = give_get_currency();
+    }
+
+    if ( function_exists( 'give_get_option' ) ) {
+        $currency_candidates[] = give_get_option( 'currency', 'USD' );
+    }
+
+    $currency_candidates[] = 'USD';
+
+    $currency = 'USD';
+
+    foreach ( $currency_candidates as $candidate ) {
+        if ( is_string( $candidate ) || is_numeric( $candidate ) ) {
+            $candidate = strtoupper( trim( (string) $candidate ) );
+
+            if ( '' !== $candidate ) {
+                $currency = $candidate;
+                break;
+            }
+        }
+    }
+
+    /**
+     * Filters the currency code that is stored with the donation.
+     *
+     * @since 1.0.2
+     *
+     * @param string $currency     Currency code.
+     * @param int    $give_form_id GiveWP form ID.
+     * @param array  $post_data    Posted form data.
+     */
+    return apply_filters( 'jcc_givewp_donation_currency', $currency, $give_form_id, $post_data );
+}
+
 
 
 /**
@@ -407,17 +467,15 @@ function jcc_givewp_process_payment( $purchase_data ) {
         $give_form_id = absint( $purchase_data['give_form_id'] );
     } elseif ( isset( $post_data['give-form-id'] ) ) {
         $give_form_id = absint( $post_data['give-form-id'] );
+    } elseif ( isset( $post_data['give_form_id'] ) ) {
+        $give_form_id = absint( $post_data['give_form_id'] );
     }
 
-    $currency = '';
+    $currency = jcc_givewp_get_donation_currency( $give_form_id, $post_data );
 
-    if ( isset( $post_data['give-currency'] ) && '' !== $post_data['give-currency'] ) {
-        $currency = $post_data['give-currency'];
-    } elseif ( $give_form_id ) {
-        $currency = give_get_currency( $give_form_id );
-    } else {
-        $currency = give_get_currency();
-    }
+    $gateway_settings = jcc_givewp_get_gateway_settings();
+    $is_test_mode     = ! empty( $gateway_settings['givewp_jcc_payment_gateway_test_mode'] );
+    $mode             = $is_test_mode ? 'test' : 'live';
 
     $card_type = isset( $post_data['card-type'] ) ? $post_data['card-type'] : '';
 
@@ -435,6 +493,8 @@ function jcc_givewp_process_payment( $purchase_data ) {
         'currency'        => $currency,
         'user_info'       => isset( $purchase_data['user_info'] ) ? $purchase_data['user_info'] : array(),
         'status'          => 'publish',
+        'gateway'         => 'jcc-gateway-for-givewp',
+        'mode'            => $mode,
     );
 
     // Record the pending payment
@@ -449,16 +509,17 @@ function jcc_givewp_process_payment( $purchase_data ) {
         return;
     }
 
-    // Get the gateway settings
-    $gateway_settings = jcc_givewp_get_gateway_settings();
-
     // Prepare the payment parameters
+    $merchant_id = $is_test_mode
+        ? ( isset( $gateway_settings['givewp_jcc_payment_gateway_test_merchant_id'] ) ? $gateway_settings['givewp_jcc_payment_gateway_test_merchant_id'] : '' )
+        : ( isset( $gateway_settings['givewp_jcc_payment_gateway_production_merchant_id'] ) ? $gateway_settings['givewp_jcc_payment_gateway_production_merchant_id'] : '' );
+
     $payment_params = array(
         'total'      => give_format_amount( $amount ),
         'currency'   => $currency,
         'language'   => jcc_givewp_get_payment_language( $give_form_id ),
         'method'     => $card_type,
-        'merchantID' => $gateway_settings['givewp_jcc_payment_gateway_test_mode'] ? $gateway_settings['givewp_jcc_payment_gateway_test_merchant_id'] : $gateway_settings['givewp_jcc_payment_gateway_production_merchant_id'],
+        'merchantID' => $merchant_id,
     );
 
     // Include additional information if billing is enabled
@@ -672,6 +733,78 @@ function jcc_givewp_process_ipn() {
         // ...
 
         exit;
+    }
+}
+
+add_action( 'init', 'jcc_givewp_backfill_missing_currency', 20 );
+
+/**
+ * Ensure historical donations recorded by this gateway have a valid currency code.
+ *
+ * GiveWP 3.0+ stores donations in the custom donations table. Prior versions stored donations
+ * as a custom post type which does not trigger the fatal error reported by GiveWP 3.0 when the
+ * currency column contains NULL. To remain backwards compatible, this routine runs once after
+ * the plugin update to backfill the currency for existing donations that were created before
+ * the validation fix introduced in version 1.0.2.
+ *
+ * @since 1.0.2
+ *
+ * @return void
+ */
+function jcc_givewp_backfill_missing_currency() {
+    if ( get_option( 'jcc_givewp_backfill_missing_currency', false ) ) {
+        return;
+    }
+
+    global $wpdb;
+
+    $donations_table = $wpdb->prefix . 'give_donations';
+
+    // Confirm the donations table exists before attempting to update.
+    $table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $donations_table ) );
+
+    if ( $table_exists !== $donations_table ) {
+        return;
+    }
+
+    $default_currency = jcc_givewp_get_donation_currency( 0, array() );
+
+    if ( ! is_string( $default_currency ) || '' === $default_currency ) {
+        $default_currency = 'USD';
+    }
+
+    $donationmeta_table = $wpdb->prefix . 'give_donationmeta';
+    $meta_table_exists  = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $donationmeta_table ) );
+
+    if ( $meta_table_exists === $donationmeta_table ) {
+        $updated = $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$donations_table} donations
+                INNER JOIN {$donationmeta_table} meta ON donations.id = meta.donation_id
+                SET donations.currency = %s
+                WHERE (donations.currency IS NULL OR donations.currency = '')
+                AND meta.meta_key = %s
+                AND meta.meta_value = %s",
+                $default_currency,
+                '_give_payment_gateway',
+                'jcc-gateway-for-givewp'
+            )
+        );
+    } else {
+        $updated = $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$donations_table}
+                SET currency = %s
+                WHERE (currency IS NULL OR currency = '')
+                AND gateway = %s",
+                $default_currency,
+                'jcc-gateway-for-givewp'
+            )
+        );
+    }
+
+    if ( false !== $updated ) {
+        update_option( 'jcc_givewp_backfill_missing_currency', 1, false );
     }
 }
 
